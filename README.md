@@ -13,11 +13,11 @@
 
 ### 1. Battle Pass UI (`Scene_UI`)
 UI sahnesini açıp Unity Editor üzerinde **Play** butonuna basarak aşağıdaki özellikleri test edebilirsiniz:
-*   **Kaydırma (Scroll):** Mouse tekerleğiyle veya sürükleyerek Battle Pass kartları arasında sağa/sola kaydırma (scroll) yapabilirsiniz.
+*   **Kaydırma (Scroll):** Mouse sol tuşu ile sürükleyerek Battle Pass kartları arasında sağa/sola kaydırma (scroll) yapabilirsiniz.
 *   **Seviye ve Deneyim Testi (Level & XP):** Hierarchy'de yer alan `BattlePassManager` bileşeni üzerinden **`Current Level`** ve **`Current XP`** değerlerini elle değiştirerek seviye ilerlemesini ve kartların dinamik güncellenmesini anlık olarak test edebilirsiniz.
 *   **Premium Ödüller:** Yine `BattlePassManager` üzerindeki **`isPremium`** seçeneğini aktif/deaktif ederek premium ödül akışını ve kilit açılma durumlarını inceleyebilirsiniz.
-*   **Ödül Kartı Etkileşimi:** Fareyle claimable (alınabilir) durumdaki kartlara tıklayarak ödül alma animasyonlarını ve görsel etkilerini test edebilirsiniz.
-*   **Performans:** UI sistemi, performansı korumak adına tamamen **event tabanlı** bir mimariyle geliştirilmiştir (kod tasarımı aşamasında yapay zeka desteğinden yararlanılmıştır).
+*   **Ödül Kartı Etkileşimi:** Fareyle claimable (alınabilir) durumdaki kartlara tıklayarak ödül alma VFX'lerini test edebilirsiniz.
+*   **Performans:** UI sistemi, performansı korumak adına tamamen **event tabanlı** bir mimariyle geliştirilmiştir (kod tasarımı aşamasında yapay zeka desteğinden yararlanılmıştır). Ayrıca build time için sprite atlas hazırlanıp build alarak draw call sayısının editöre göre daha düşük olduğu teyit edilmiştir.
 
 ### 2. Silah Showroom (`Scene_Weapon`)
 Silah sahnesini açıp Unity Editor üzerinde **Play** butonuna basarak aşağıdaki etkileşimleri deneyimleyebilirsiniz:
