@@ -103,26 +103,13 @@ Shader "UI/Custom/LightSweep"
                 o.worldPosition = v.vertex;
                 o.vertex = UnityObjectToClipPos(o.worldPosition);
                 o.texcoord = TRANSFORM_TEX(v.texcoord, _MainTex);
-                o.localUV = v.texcoord1;
-                o.color = v.color * _Color;
-                return o;
-            }
-
-            fixed4 frag(v2f IN) : SV_Target
-            {
-                // Ana Buton Doku Örneklemesi (Atlas koordinatları ile)
-                half4 color = (tex2D(_MainTex, IN.texcoord) + _TextureSampleAdd) * IN.color;
                 
-                // Atlastan bağımsız localUV (C# tarafından enjekte edilen uv1) kullanıyoruz.
-                // Eğer UILocalUVModifier atanmamışsa localUV (0,0) olacaktır.
-                // Hem editörde hem build'de en güvenli çalışma için localUV kullanırız.
-                float2 finalUV = IN.localUV;
-                
+                // Sweep UV rotasyon ve zaman bazli offset islemlerini vertex shader'da yapiyoruz
                 float rad = _SweepAngle * 0.0174532925;
                 float sinAngle, cosAngle;
                 sincos(rad, sinAngle, cosAngle);
                 
-                float2 uvCentered = finalUV - 0.5;
+                float2 uvCentered = v.texcoord1 - 0.5;
                 float2 rotatedUV;
                 rotatedUV.x = uvCentered.x * cosAngle - uvCentered.y * sinAngle;
                 rotatedUV.y = uvCentered.x * sinAngle + uvCentered.y * cosAngle;
@@ -134,15 +121,27 @@ Shader "UI/Custom/LightSweep"
                 float endPos = 2.0;
                 float currentOffset = lerp(startPos, endPos, saturate(currentTime * _SweepSpeed));
                 
-                float2 sweepUV;
-                sweepUV.x = rotatedUV.x - currentOffset;
-                sweepUV.y = rotatedUV.y;
+                o.localUV.x = rotatedUV.x - currentOffset;
+                o.localUV.y = rotatedUV.y;
                 
-                half4 sweepSample = half4(0,0,0,0);
-                if (sweepUV.x >= 0.0 && sweepUV.x <= 1.0)
-                {
-                    sweepSample = tex2D(_SweepTex, sweepUV);
-                }
+                o.color = v.color * _Color;
+                return o;
+            }
+
+            fixed4 frag(v2f IN) : SV_Target
+            {
+                // Ana Buton Doku Örneklemesi (Atlas koordinatları ile)
+                half4 color = (tex2D(_MainTex, IN.texcoord) + _TextureSampleAdd) * IN.color;
+                
+                // Atlastan bağımsız localUV (Vertex shader'da hesaplanan sweepUV koordinati)
+                float2 sweepUV = IN.localUV;
+                
+                // Kosullu dallanma (if) yerine, dokuyu unconditionally sample edip disariya tasan kisimlari matematikle maskeliyoruz
+                half4 sweepSample = tex2D(_SweepTex, sweepUV);
+                
+                // [0..1] araligi disindaki UV degerlerini maskelemek icin (Wrap: Clamp oldugundan kenar piksellerin tasmamasi adina)
+                float mask = step(0.0, sweepUV.x) * step(sweepUV.x, 1.0) * step(0.0, sweepUV.y) * step(sweepUV.y, 1.0);
+                sweepSample *= mask;
                 
                 fixed3 finalRGB = color.rgb + (sweepSample.rgb * sweepSample.a * _SweepColor.rgb * _SweepColor.a * _SweepIntensity * color.a);
                 half4 finalColor = half4(finalRGB, color.a);

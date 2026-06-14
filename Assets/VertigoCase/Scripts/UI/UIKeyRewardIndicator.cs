@@ -35,6 +35,11 @@ namespace VertigoCase.UI
         private CanvasGroup canvasGroup;
         private bool isCurrentlyVisible = false;
 
+        // GC Optimization Cache Fields
+        private RectTransform parentRect;
+        private bool isCircleChildOfArrow;
+        private bool isIconChildOfArrow;
+
         private void Start()
         {
             indicatorRect = GetComponent<RectTransform>();
@@ -93,10 +98,17 @@ namespace VertigoCase.UI
             canvasGroup.alpha = 0f;
             canvasGroup.blocksRaycasts = false;
             canvasGroup.interactable = false;
+
+            // Cache parent rect and child relationship to prevent frame allocation
+            parentRect = indicatorRect.parent as RectTransform;
+            isCircleChildOfArrow = circleRect != null && arrowImage != null && circleRect.IsChildOf(arrowImage.transform);
+            isIconChildOfArrow = rewardIconImage != null && arrowImage != null && rewardIconImage.rectTransform.IsChildOf(arrowImage.transform);
         }
 
         public void SetTarget(RectTransform targetNode, Sprite rewardIcon)
         {
+            if (targetRewardNode == targetNode && rewardIconImage != null && rewardIconImage.sprite == rewardIcon) return;
+
             targetRewardNode = targetNode;
             if (rewardIconImage != null)
             {
@@ -131,7 +143,7 @@ namespace VertigoCase.UI
 
         private void UpdateIndicatorPosition()
         {
-            if (viewportRect == null || indicatorRect == null) return;
+            if (viewportRect == null || indicatorRect == null || parentRect == null) return;
 
             // Do not show if target node is null
             if (targetRewardNode == null)
@@ -139,9 +151,6 @@ namespace VertigoCase.UI
                 SetVisibility(false);
                 return;
             }
-
-            RectTransform parentRect = indicatorRect.parent as RectTransform;
-            if (parentRect == null) return;
 
             // Convert target node world position to parent local coordinates
             Vector3 targetWorldPos = targetRewardNode.position;
@@ -186,10 +195,6 @@ namespace VertigoCase.UI
                 arrowImage.rectTransform.pivot = new Vector2(0.5f, 0.5f);
                 arrowImage.rectTransform.anchoredPosition = Vector2.zero;
                 arrowImage.rectTransform.localRotation = Quaternion.Euler(rightRotation);
-
-                // Check child hierarchy for rotation compensation
-                bool isCircleChildOfArrow = circleRect != null && circleRect.IsChildOf(arrowImage.transform);
-                bool isIconChildOfArrow = rewardIconImage != null && rewardIconImage.rectTransform.IsChildOf(arrowImage.transform);
 
                 // Circle/Container orientation adjustment
                 if (circleRect != null)

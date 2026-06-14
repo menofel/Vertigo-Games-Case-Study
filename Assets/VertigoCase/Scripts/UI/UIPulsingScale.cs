@@ -18,6 +18,7 @@ namespace VertigoCase.UI
         private Vector3 originalScale;
         private bool hasCachedScale = false;
         private Coroutine pulseCoroutine;
+        private WaitForSecondsRealtime m_WaitBetweenCycles;
 
         private void Awake()
         {
@@ -43,6 +44,7 @@ namespace VertigoCase.UI
         private void StartPulse()
         {
             StopPulse();
+            m_WaitBetweenCycles = new WaitForSecondsRealtime(delayBetweenCycles);
             pulseCoroutine = StartCoroutine(PulseLoopRoutine());
         }
 
@@ -82,7 +84,7 @@ namespace VertigoCase.UI
                 }
 
                 // 2. Rest Phase: Wait for the specified delay between cycles
-                yield return new WaitForSecondsRealtime(delayBetweenCycles);
+                yield return m_WaitBetweenCycles;
             }
         }
 

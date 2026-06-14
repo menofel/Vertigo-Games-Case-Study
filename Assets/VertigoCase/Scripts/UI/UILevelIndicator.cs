@@ -42,6 +42,11 @@ namespace VertigoCase.UI
         private Coroutine snapCoroutine;
         private CanvasGroup canvasGroup;
 
+        // GC Optimization Cache Fields
+        private RectTransform parentRect;
+        private bool isCircleChildOfArrow;
+        private bool isTextChildOfArrow;
+
         private void Start()
         {
             indicatorRect = GetComponent<RectTransform>();
@@ -50,10 +55,17 @@ namespace VertigoCase.UI
             {
                 canvasGroup = gameObject.AddComponent<CanvasGroup>();
             }
+
+            // Cache parent rect and child relationship to prevent frame allocation
+            parentRect = indicatorRect.parent as RectTransform;
+            isCircleChildOfArrow = circleRect != null && arrowImage != null && circleRect.IsChildOf(arrowImage.transform);
+            isTextChildOfArrow = indicatorText != null && arrowImage != null && indicatorText.rectTransform.IsChildOf(arrowImage.transform);
         }
 
         public void SetTarget(RectTransform targetNode, int level)
         {
+            if (targetLevelNode == targetNode && currentLevelNumber == level) return;
+
             targetLevelNode = targetNode;
             currentLevelNumber = level;
             if (indicatorText != null)
@@ -88,10 +100,7 @@ namespace VertigoCase.UI
 
         private void UpdateIndicatorPosition()
         {
-            if (targetLevelNode == null || viewportRect == null || indicatorRect == null) return;
-
-            RectTransform parentRect = indicatorRect.parent as RectTransform;
-            if (parentRect == null) return;
+            if (targetLevelNode == null || viewportRect == null || indicatorRect == null || parentRect == null) return;
 
             // Convert target node world position to parent local coordinates
             Vector3 targetWorldPos = targetLevelNode.position;
@@ -169,10 +178,6 @@ namespace VertigoCase.UI
                             arrowImage.rectTransform.localRotation = Quaternion.Euler(rightRotation);
                             break;
                     }
-
-                    // Detect whether children are nested under Arrow or siblings
-                    bool isCircleChildOfArrow = circleRect != null && circleRect.IsChildOf(arrowImage.transform);
-                    bool isTextChildOfArrow = indicatorText != null && indicatorText.rectTransform.IsChildOf(arrowImage.transform);
 
                     // 1. Circle/Container Alignment
                     if (circleRect != null)

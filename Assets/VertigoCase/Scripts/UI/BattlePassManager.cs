@@ -85,6 +85,27 @@ namespace VertigoCase.UI
         private float initialLineLocalY;
         private float initialLineLocalZ;
 
+        // GC Optimization Cache Fields
+        private Vector3[] m_Corners;
+        private WaitForSeconds m_WaitCountdown;
+        private WaitForSeconds m_WaitAnimateDelay;
+        private string m_CachedGemCostString;
+
+        private struct ActiveVfxInfo
+        {
+            public GameObject instance;
+            public float deactivateTime;
+        }
+        private Dictionary<GameObject, List<GameObject>> m_VfxPools;
+        private List<ActiveVfxInfo> m_ActiveVfxList;
+
+        // LateUpdate performance caching
+        private float m_LastScrollPos = -1f;
+        private int m_LastScreenWidth = -1;
+        private int m_LastScreenHeight = -1;
+        private int m_LastLevel = -1;
+        private int m_LastXp = -1;
+
         public int CurrentLevel => currentLevel;
         public bool IsPremiumActive => isPremiumActive;
 
@@ -784,6 +805,17 @@ namespace VertigoCase.UI
                 initialLineLocalZ = lineGradient.localPosition.z;
             }
 
+            // GC Optimization Pre-allocations
+            m_Corners = new Vector3[4];
+            m_WaitCountdown = new WaitForSeconds(1.0f);
+            m_WaitAnimateDelay = new WaitForSeconds(0.5f);
+            m_CachedGemCostString = gemCostPerLevel.ToString();
+
+            m_VfxPools = new Dictionary<GameObject, List<GameObject>>(2);
+            if (freeClaimVfxPrefab != null) m_VfxPools.Add(freeClaimVfxPrefab, new List<GameObject>(4));
+            if (premiumClaimVfxPrefab != null) m_VfxPools.Add(premiumClaimVfxPrefab, new List<GameObject>(4));
+            m_ActiveVfxList = new List<ActiveVfxInfo>(8);
+
             // tierList must be populated. Warn if empty.
             if (tierList == null || tierList.Count == 0)
             {
@@ -884,9 +916,15 @@ namespace VertigoCase.UI
 
         private int GetNodeIndexForLevel(int level)
         {
-            int idx = instantiatedNodes.FindIndex(n => n.TierData.level == level);
-            if (idx == -1) return level <= 0 ? 0 : instantiatedNodes.Count - 1;
-            return idx;
+            int count = instantiatedNodes.Count;
+            for (int i = 0; i < count; i++)
+            {
+                if (instantiatedNodes[i].TierData.level == level)
+                {
+                    return i;
+                }
+            }
+            return level <= 0 ? 0 : count - 1;
         }
 
         private void UpdateProgressLine()
@@ -933,24 +971,39 @@ namespace VertigoCase.UI
 
         private void LateUpdate()
         {
-            // Refreshes alignments on LateUpdate to support dynamic screen resizing
-            if (instantiatedNodes != null && instantiatedNodes.Count > 0)
+            if (instantiatedNodes == null || instantiatedNodes.Count == 0) return;
+
+            float currentScroll = scrollRect != null ? scrollRect.horizontalNormalizedPosition : 0f;
+            int screenWidth = Screen.width;
+            int screenHeight = Screen.height;
+
+            // Run alignment logic only when coordinates, size, or level progress actually change,
+            // preventing constant per-frame Canvas and ScrollRect hierarchy dirtying.
+            if (currentScroll != m_LastScrollPos || 
+                screenWidth != m_LastScreenWidth || 
+                screenHeight != m_LastScreenHeight ||
+                currentLevel != m_LastLevel ||
+                currentXp != m_LastXp)
             {
+                m_LastScrollPos = currentScroll;
+                m_LastScreenWidth = screenWidth;
+                m_LastScreenHeight = screenHeight;
+                m_LastLevel = currentLevel;
+                m_LastXp = currentXp;
+
                 UpdateProgressLine();
                 UpdateFloatingIndicatorTarget();
             }
         }
 
-        public Vector3 GetProgressFillEndWorldPosition()
+        private Vector3 GetProgressFillEndWorldPosition()
         {
-            if (roadSlider == null || instantiatedNodes.Count == 0 || roadSlider.fillRect == null) return Vector3.zero;
+            if (roadSlider == null || roadSlider.fillRect == null || m_Corners == null) return Vector3.zero;
 
-            // Retrieve the right edge world position of the slider fill area
-            Vector3[] corners = new Vector3[4];
-            roadSlider.fillRect.GetWorldCorners(corners);
+            roadSlider.fillRect.GetWorldCorners(m_Corners);
             
             // Midpoint of right-top and right-bottom corners is the end of fill
-            return (corners[2] + corners[3]) / 2f;
+            return (m_Corners[2] + m_Corners[3]) / 2f;
         }
 
         private void UpdateFloatingIndicatorTarget()
@@ -1046,7 +1099,7 @@ namespace VertigoCase.UI
                         lineGradient.localPosition = new Vector3(localPosInContent.x, initialLineLocalY, initialLineLocalZ);
                     }
 
-                    levelSkipButton.UpdateSkipCost(gemIconSprite, gemCostPerLevel.ToString());
+                    levelSkipButton.UpdateSkipCost(gemIconSprite, m_CachedGemCostString);
                 }
             }
         }
@@ -1084,20 +1137,65 @@ namespace VertigoCase.UI
             UpdateAllUI();
         }
 
+        private GameObject GetVfxInstance(GameObject prefab)
+        {
+            if (prefab == null) return null;
+            
+            if (!m_VfxPools.TryGetValue(prefab, out List<GameObject> pool))
+            {
+                pool = new List<GameObject>(4);
+                m_VfxPools.Add(prefab, pool);
+            }
+            
+            for (int i = 0; i < pool.Count; i++)
+            {
+                GameObject instance = pool[i];
+                if (instance != null && !instance.activeSelf)
+                {
+                    instance.SetActive(true);
+                    return instance;
+                }
+            }
+            
+            GameObject newInstance = Instantiate(prefab, transform);
+            pool.Add(newInstance);
+            return newInstance;
+        }
+
+        private void Update()
+        {
+            if (m_ActiveVfxList != null && m_ActiveVfxList.Count > 0)
+            {
+                float currentTime = Time.time;
+                for (int i = m_ActiveVfxList.Count - 1; i >= 0; i--)
+                {
+                    var info = m_ActiveVfxList[i];
+                    if (currentTime >= info.deactivateTime)
+                    {
+                        if (info.instance != null)
+                        {
+                            info.instance.SetActive(false);
+                        }
+                        m_ActiveVfxList.RemoveAt(i);
+                    }
+                }
+            }
+        }
+
         private void SpawnClaimVFX(BattlePassNode node, bool isPremium)
         {
             GameObject prefabToSpawn = isPremium ? premiumClaimVfxPrefab : freeClaimVfxPrefab;
             if (prefabToSpawn == null) return;
 
-            // Spawn the VFX instance under this manager's canvas hierarchy
-            GameObject vfxInstance = Instantiate(prefabToSpawn, transform);
+            // Get pre-allocated or cached VFX instance from the pool instead of raw Instantiate
+            GameObject vfxInstance = GetVfxInstance(prefabToSpawn);
             
             if (vfxInstance != null)
             {
                 // Position VFX at the clicked card's world position
                 vfxInstance.transform.position = node.GetCardWorldPosition(isPremium);
                 
-                // Auto-destroy after the longest active particle system finishes playing
+                // Determine lifetime duration based on the longest active particle system
                 ParticleSystem[] allPS = vfxInstance.GetComponentsInChildren<ParticleSystem>();
                 float duration = 3.0f; // Default fallback if no particle systems found
                 
@@ -1130,7 +1228,8 @@ namespace VertigoCase.UI
                     }
                 }
                 
-                Destroy(vfxInstance, duration);
+                // Store active VFX with timer in m_ActiveVfxList to deactivate (rather than Destroy)
+                m_ActiveVfxList.Add(new ActiveVfxInfo { instance = vfxInstance, deactivateTime = Time.time + duration });
             }
         }
 
@@ -1162,7 +1261,7 @@ namespace VertigoCase.UI
             targetNormalized = Mathf.Clamp01(targetNormalized);
 
             // Delay scroll scroll animation slightly for visual effect
-            yield return new WaitForSeconds(0.5f);
+            yield return m_WaitAnimateDelay;
 
             float duration = 1.5f;
             float elapsed = 0f;
@@ -1234,7 +1333,7 @@ namespace VertigoCase.UI
                     }
                 }
 
-                yield return new WaitForSeconds(1.0f);
+                yield return m_WaitCountdown;
             }
         }
     }

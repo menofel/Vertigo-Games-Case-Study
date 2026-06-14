@@ -92,18 +92,6 @@ Shader "VertigoCase/UI/PanningTile"
             float _Rotation;
             float _AspectRatio;
 
-            v2f vert(appdata v)
-            {
-                v2f OUT;
-                UNITY_SETUP_INSTANCE_ID(v);
-                UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(OUT);
-                OUT.worldPosition = v.vertex;
-                OUT.vertex = UnityObjectToClipPos(v.vertex);
-                OUT.texcoord = v.texcoord;
-                OUT.color = v.color * _Color;
-                return OUT;
-            }
-
             // UV'yi merkez etrafinda aspect ratio kompanzasyonuyla dondurme
             float2 RotateUV(float2 uv, float angleDeg, float aspect)
             {
@@ -128,21 +116,30 @@ Shader "VertigoCase/UI/PanningTile"
                 return rotated;
             }
 
+            v2f vert(appdata v)
+            {
+                v2f OUT;
+                UNITY_SETUP_INSTANCE_ID(v);
+                UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(OUT);
+                OUT.worldPosition = v.vertex;
+                OUT.vertex = UnityObjectToClipPos(v.vertex);
+                
+                // UV donme, tiling ve zamana bagli kaydirma islemlerini vertex shader'da yapiyoruz
+                float2 uv = RotateUV(v.texcoord, _Rotation, _AspectRatio);
+                uv *= _Tiling.xy;
+                uv += _Time.y * _ScrollSpeed.xy;
+                
+                OUT.texcoord = uv;
+                OUT.color = v.color * _Color;
+                return OUT;
+            }
+
             fixed4 frag(v2f IN) : SV_Target
             {
-                // 1. UV'yi dondur
-                float2 uv = RotateUV(IN.texcoord, _Rotation, _AspectRatio);
+                // Source Image'i sample et (UV interpolasyonu donmus ve kaymis sekilde gelir)
+                half4 color = (tex2D(_MainTex, IN.texcoord) + _TextureSampleAdd) * IN.color;
 
-                // 2. Tiling uygula
-                uv *= _Tiling.xy;
-
-                // 3. Zamana bagli kaydir (scroll)
-                uv += _Time.y * _ScrollSpeed.xy;
-
-                // 4. Source Image'i sample et
-                half4 color = (tex2D(_MainTex, uv) + _TextureSampleAdd) * IN.color;
-
-                // 5. UI Mask clipping
+                // UI Mask clipping
                 #ifdef UNITY_UI_CLIP_RECT
                 color.a *= UnityGet2DClipping(IN.worldPosition.xy, _ClipRect);
                 #endif
