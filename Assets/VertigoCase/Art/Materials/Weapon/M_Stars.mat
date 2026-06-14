@@ -11,7 +11,8 @@ Material:
   m_Shader: {fileID: -6465566751694194690, guid: af0280430fd14ac47abe08c3cb75caf2, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
-  m_ValidKeywords: []
+  m_ValidKeywords:
+  - _CHANNEL_SELECT_R
   m_InvalidKeywords:
   - _EMISSION
   - _FLIPBOOKBLENDING_OFF
@@ -52,7 +53,7 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _MainTex:
-        m_Texture: {fileID: 2800000, guid: 9ea274559c01b674895169a9b8f67a88, type: 3}
+        m_Texture: {fileID: 2800000, guid: bfba80afa4813f64582a49854d5bc3a5, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _MetallicGlossMap:
@@ -92,6 +93,7 @@ Material:
     - _BlendModePreserveSpecular: 1
     - _BlendOp: 0
     - _BumpScale: 1
+    - _CHANNEL_SELECT: 0
     - _CameraFadingEnabled: 0
     - _CameraFarFadeDistance: 2
     - _CameraNearFadeDistance: 1
@@ -114,7 +116,7 @@ Material:
     - _GlossMapScale: 0
     - _Glossiness: 0
     - _GlossyReflections: 0
-    - _Intensity: 3
+    - _Intensity: 2
     - _Metallic: 0
     - _Mode: 0
     - _OcclusionStrength: 1
